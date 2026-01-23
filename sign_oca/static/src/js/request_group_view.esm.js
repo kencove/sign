@@ -15,7 +15,6 @@ registerModel({
             // Fetch the data from the button otherwise fetch the ones from the parent (.o_ActivityMenuView_activityGroup).
             const data = _.extend({}, $(ev.currentTarget).data(), $(ev.target).data());
             const context = {};
-            console.log(data);
 
             this.env.services.action.doAction(
                 {

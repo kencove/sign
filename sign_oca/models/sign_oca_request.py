@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import logging
 from base64 import b64decode, b64encode
 from hashlib import sha256
 from io import BytesIO
@@ -19,6 +20,8 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import float_repr
 from odoo.tools.misc import get_lang
+
+_logger = logging.getLogger(__name__)
 
 
 class SignOcaRequest(models.Model):
@@ -424,18 +427,30 @@ class SignOcaRequestSigner(models.Model):
         self.ensure_one()
         self._set_action_log("view", access_token=access_token)
         partner_fields_dict = {"id": self.partner_id.id}
+        user_id = self.env["res.users"].search(
+            [("partner_id", "=", self.partner_id.id)]
+        )
         for field_name, field_info in (
-            self.env["res.partner"]
-            .with_user(self.partner_id.user_id)
-            .fields_get()
-            .items()
+            self.env["res.partner"].with_user(user_id).fields_get().items()
         ):
             if field_info["type"] in ["char", "text"]:
                 partner_fields_dict.update({field_name: self.partner_id[field_name]})
             if field_info["type"] == "many2one":
-                partner_fields_dict.update(
-                    {field_name: self.partner_id[field_name].name}
-                )
+                # Manage KeyError if user add a wrong technical field name.
+                try:
+                    # name_get method returns a list, if name exists the list looks like:
+                    # [(123, 'Foo')]
+                    name_get = self.partner_id[field_name].name_get()
+                    if name_get and name_get[0]:
+                        partner_fields_dict.update({field_name: name_get[0][1]})
+                        # We need the state code as some forms have small space for state,
+                        # and state name is very large to fit in a small space.
+                        if field_name == "state_id":
+                            rec_id = name_get[0][0]
+                            state_id = self.env["res.country.state"].browse([rec_id])
+                            partner_fields_dict.update({"state_id.code": state_id.code})
+                except KeyError as e:
+                    _logger.debug("Missing key in partner field lookup: %s", e)
         # add current_date formatted string too
         lang_id = get_lang(self.env, self.env.user.lang)
         partner_fields_dict.update(

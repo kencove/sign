@@ -14,7 +14,10 @@ const signatureSignOca = {
             (i) => i.tabindex > item.tabindex
         ).sort((a, b) => a.tabindex - b.tabindex);
         if (next_items.length > 0) {
-            parent.items[next_items[0].id].dispatchEvent(new Event("focus_signature"));
+            const nextItem = next_items[0];
+            if (nextItem && parent.items && parent.items[nextItem.id]) {
+                parent.items[nextItem.id].dispatchEvent(new Event("focus_signature"));
+            }
         }
     },
     generate: function (parent, item, signatureItem) {
@@ -22,29 +25,36 @@ const signatureSignOca = {
             core.qweb.render("sign_oca.sign_iframe_field_signature", {item: item})
         )[0];
         if (item.role_id === parent.info.role_id) {
+            const requestOpenDialog = () => {
+                if (!item.dialogOpened) {
+                    item.dialogOpened = true;
+                    var signatureOptions = {
+                        fontColor: "DarkBlue",
+                        defaultName: parent.info.partner.name,
+                    };
+                    parent.env.services.dialog.add(
+                        SignatureDialog,
+                        {
+                            ...signatureOptions,
+                            uploadSignature: (data) =>
+                                this.uploadSignature(parent, item, signatureItem, data),
+                        },
+                        {
+                            onClose: () => {
+                                item.dialogOpened = false;
+                            },
+                        }
+                    );
+                }
+            };
+
             signatureItem[0].addEventListener("focus_signature", () => {
-                var signatureOptions = {
-                    fontColor: "DarkBlue",
-                    defaultName: parent.info.partner.name,
-                };
-                parent.env.services.dialog.add(SignatureDialog, {
-                    ...signatureOptions,
-                    uploadSignature: (data) =>
-                        this.uploadSignature(parent, item, signatureItem, data),
-                });
+                requestOpenDialog();
             });
             input.addEventListener("click", (ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
-                var signatureOptions = {
-                    fontColor: "DarkBlue",
-                    defaultName: parent.info.partner.name,
-                };
-                parent.env.services.dialog.add(SignatureDialog, {
-                    ...signatureOptions,
-                    uploadSignature: (data) =>
-                        this.uploadSignature(parent, item, signatureItem, data),
-                });
+                requestOpenDialog();
             });
             input.addEventListener("keydown", (ev) => {
                 if ((ev.keyCode || ev.which) !== 9) {
@@ -58,9 +68,12 @@ const signatureSignOca = {
                 );
                 if (next_items.length > 0) {
                     ev.currentTarget.blur();
-                    parent.items[next_items[0].id].dispatchEvent(
-                        new Event("focus_signature")
-                    );
+                    const nextItem = next_items[0];
+                    if (nextItem && parent.items && parent.items[nextItem.id]) {
+                        parent.items[nextItem.id].dispatchEvent(
+                            new Event("focus_signature")
+                        );
+                    }
                 }
             });
         }

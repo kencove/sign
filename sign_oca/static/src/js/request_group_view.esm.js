@@ -25,7 +25,7 @@ registerModel({
                     search_view_id: [false],
                     type: "ir.actions.act_window",
                     domain: [
-                        ["request_id.state", "=", "sent"],
+                        ["request_id.state", "=", "0_sent"],
                         ["partner_id", "child_of", [session.partner_id]],
                         ["signed_on", "=", false],
                     ],
